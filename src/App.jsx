@@ -1,15 +1,8 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { BaseStyles, ThemeProvider, Header, Octicon } from '@primer/react'
 import { BugIcon } from '@primer/octicons-react'
 
-import CRHome from './Components/CRHome'
-import CRUpload from './Components/CRUpload'
+import CRUpload from './components_t/CRUpload'
 
-
-const router = createBrowserRouter([
-  { path: "/", element: <CRHome /> },
-  { path: "/upload", element: <CRUpload /> },
-]);
 
 function App() {
   return (
@@ -18,7 +11,7 @@ function App() {
         <Header>
           <Header.Item full>
             <Header.Link href="/" sx={{ fontSize: 2 }}>
-              <Octicon icon={BugIcon} size={24} sx={{ mr: 2 }} />
+              <Octicon icon={BugIcon} size={24} sx={{ mr: 3 }} />
               <span>CrashReader</span>
             </Header.Link>
           </Header.Item>
@@ -28,7 +21,7 @@ function App() {
             </Header.Link>
           </Header.Item>
         </Header>
-        <RouterProvider router={router} />
+        <CRUpload />
       </BaseStyles>
     </ThemeProvider>
   )
