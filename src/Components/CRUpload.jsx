@@ -73,37 +73,33 @@ function CRInfoTabSummary({ fileContents }) {
 }
 
 function CRInfoTabCallstack({ fileContents }) {
-  const firstThread = fileContents.threads[0];
-
   const [trimFrames, setTrimFrames] = useState(true);
   const [trimFilenames, setTrimFilenames] = useState(true);
   const [showDisassembly, setShowDisassembly] = useState(false);
 
-  const frameFilter = trimFrames
-    ? (frame) => !frame.module_name.includes("Windows\\System32")
-    : (_) => true
-  const nameFilter = trimFilenames
+  const getFilename = trimFilenames
     ? (path) => path.split('\\').pop().split('/').pop()
     : (path) => path
 
-  const indexedFrames = firstThread.frames.map((frame, index) => {
-    frame.local_index = index
-    return frame
-  })
-  const frameElements = indexedFrames.filter(frameFilter).map((frameInfo) => {
-    return (
-      <div key={frameInfo.local_index} style={{ marginBottom: '0.1rem' }}>
-        <code>
-          <span className="frame-id">{ frameInfo.local_index }.</span> <strong>{ asHex(frameInfo.instruction) }</strong> in { nameFilter(frameInfo.module_name) }
-        </code>
-      </div>
-    )
-  })
+  // We can assume that the first thread is what crashed the program.
+  const frameElements = fileContents.threads[0].frames
+    .map((frame, index) => { return { ...frame, local_index: index } })
+    .filter(trimFrames ? (frame) => !frame.module_name.includes("Windows\\System32") : (_) => true)
+    .map((frame) => {
+      return (
+        <div key={frame.local_index}>
+          <code>
+            <span className="frame-id">{ frame.local_index }.</span>
+            <strong>{ asHex(frame.instruction) }</strong> ({ getFilename(frame.module_name) })
+          </code>
+        </div>
+      )
+    })
 
   return (
     <>
-      <CheckboxGroup sx={{ mb: 3 }}>
-        <CheckboxGroup.Label>Main stack frames' display options</CheckboxGroup.Label>
+      <CheckboxGroup sx={{ mb: 4 }}>
+        <CheckboxGroup.Label>Display options</CheckboxGroup.Label>
         <FormControl>
           <Checkbox defaultChecked={trimFrames} onChange={(e) => setTrimFrames(e.target.checked)} />
           <FormControl.Label>Hide system stack frames</FormControl.Label>
@@ -160,8 +156,7 @@ function CRInfoTabThreads({ fileContents }) {
 
 function CRInfoTabModules({ fileContents }) {
   const data = fileContents.modules.map((module) => {
-    module.id = module.name
-    return module
+    return { ...module, id: module.name }
   })
   const columns = [
     {
@@ -198,26 +193,23 @@ function CRInfoTabs({ fileContents }) {
   const [shownPage, setShownPage] = useState('summary')
 
   const pageTabs = [
-    { id: 'summary', title: 'Summary', renderContents: <CRInfoTabSummary fileContents={fileContents} /> },
-    { id: 'call-stack', title: 'Call stack', renderContents: <CRInfoTabCallstack fileContents={fileContents} /> },
-    { id: 'threads', title: 'All threads', renderContents: <CRInfoTabThreads fileContents={fileContents} /> },
-    { id: 'modules', title: 'Modules', renderContents: <CRInfoTabModules fileContents={fileContents} /> },
-  ];
+    { id: 'summary', title: 'Summary', contents: <CRInfoTabSummary fileContents={fileContents} /> },
+    { id: 'call-stack', title: 'Call stack', contents: <CRInfoTabCallstack fileContents={fileContents} /> },
+    { id: 'threads', title: 'All threads', contents: <CRInfoTabThreads fileContents={fileContents} /> },
+    { id: 'modules', title: 'Modules', contents: <CRInfoTabModules fileContents={fileContents} /> },
+  ]
 
   const pageTabElems = pageTabs.map(function (tab) {
-    const extraProps = [];
-    if (tab.id === shownPage) {
-      extraProps["aria-current"] = "page";
-    }
-    const onSelect = () => setShownPage(tab.id);
-    return <UnderlineNav.Item key={tab.id} onSelect={onSelect} {...extraProps}>{tab.title}</UnderlineNav.Item>
+    const extra = tab.id === shownPage ? { ["aria-current"]: "page" } : []
+    return <UnderlineNav.Item key={tab.id} onSelect={() => setShownPage(tab.id)} {...extra}>{tab.title}</UnderlineNav.Item>
   })
+  const pageTabContent = pageTabs.find((tab) => tab.id === shownPage).contents
 
   return (
     <div hidden={fileContents == null}>
       <UnderlineNav aria-label="main">{ pageTabElems }</UnderlineNav>
       <PageLayout containerWidth='full'>
-        <PageLayout.Content>{ pageTabs.find((tab) => tab.id === shownPage).renderContents }</PageLayout.Content>
+        <PageLayout.Content>{ pageTabContent }</PageLayout.Content>
       </PageLayout>
     </div>
   )
