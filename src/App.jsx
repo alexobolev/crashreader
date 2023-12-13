@@ -1,7 +1,7 @@
 import { BaseStyles, ThemeProvider, Header, Octicon } from '@primer/react'
 import { BugIcon } from '@primer/octicons-react'
 
-import CRUpload from './components_t/CRUpload'
+import CRUpload from './components/CRUpload'
 
 
 function App() {
