@@ -55,15 +55,13 @@ function CRInfoTabCallstack({ fileContents: crashInfo }) {
   // We can assume that the first thread is what crashed the program.
   const frameElements = crashInfo.threads[0].frames
     .map((frame, index) => { return { ...frame, local_index: index } })
-    .filter(trimFrames ? (frame) => !frame.module_name.includes("Windows\\System32") : (_) => true)
+    .filter(trimFrames ? (frame) => frame.resolved_rva !== undefined : (_) => true)
     .map((frame) => {
-      const offsetElem = frame.module_name === crashInfo.metadata.module_name
-        ? asHex(frame.instruction - crashInfo.metadata.module_base)
-        : "???"
-
+      const offsetElem = frame.resolved_rva ? asHex(frame.resolved_rva) : '???'
+      const elemOpacity = frame.resolved_rva ? 1 : 0.7;
       return (
         <div key={frame.local_index}>
-          <code>
+          <code style={{ opacity: elemOpacity }}>
             <span style={{ display: 'inline-block', minWidth: '2rem' }}>{ frame.local_index }.</span>
             <strong>{ asHex(frame.instruction) }</strong> ({ filename(frame.module_name) } + {offsetElem})
           </code>
@@ -77,7 +75,7 @@ function CRInfoTabCallstack({ fileContents: crashInfo }) {
         <CheckboxGroup.Label>Display options</CheckboxGroup.Label>
         <FormControl>
           <Checkbox defaultChecked={trimFrames} onChange={(e) => setTrimFrames(e.target.checked)} />
-          <FormControl.Label>Hide system stack frames</FormControl.Label>
+          <FormControl.Label>Hide stack frames outside the main module</FormControl.Label>
           <FormControl.Caption>Trim down the frame list to a comprehensible size.</FormControl.Caption>
         </FormControl>
         <FormControl>

@@ -1,6 +1,7 @@
 use std::time::{UNIX_EPOCH, SystemTime};
 
 use goblin::pe::PE;
+use minidump::MinidumpModule;
 use minidump_processor::ProcessState;
 use serde::Serialize;
 
@@ -50,6 +51,7 @@ pub struct CrashInfoThreadFrame {
     pub resume_address: u64,
     pub module_name: Option<String>,
     pub trust: String,
+    pub resolved_rva: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -108,6 +110,13 @@ impl CrashInfo {
         };
 
         let first_module = crash_info.modules.main_module().unwrap();
+        let resolve_rva = |module: &MinidumpModule, address: u64| -> Option<u64> {
+            if module.raw.checksum == first_module.raw.checksum {
+                Some(address - module.raw.base_of_image)
+            } else {
+                None
+            }
+        };
 
         Self {
             metadata: CrashInfoMetadata {
@@ -143,6 +152,9 @@ impl CrashInfo {
                     module_name: frame.module.clone()
                         .map(|module| module.name),
                     trust: frame.trust.as_str().into(),
+                    resolved_rva: frame.module.as_ref()
+                        .map(|module| resolve_rva(module, frame.instruction))
+                        .flatten(),
                 }).collect(),
             }).collect(),
             thread_id: crash_info.requesting_thread.map(|id| id as u64),
