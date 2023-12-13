@@ -4,7 +4,6 @@ import { BugIcon } from '@primer/octicons-react'
 
 import CRHome from './Components/CRHome'
 import CRUpload from './Components/CRUpload'
-import './App.css'
 
 
 const router = createBrowserRouter([

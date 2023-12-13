@@ -1,30 +1,118 @@
 import { useState } from 'react';
 
-import { FormControl, PageLayout, Text, UnderlineNav } from '@primer/react'
-import { PageHeader } from '@primer/react/drafts'
+import { Checkbox, FormControl, PageLayout, Text, UnderlineNav } from '@primer/react'
+import { DataTable, PageHeader, Table } from '@primer/react/drafts'
 
+import './CRUpload.css'
 import init, { wa_parse_crash } from 'wasm'
 
 
 init()
 
 
-function CRIntoTabSummary({fileInfo}) {
+function asHex(number) {
+  return '0x' + number.toString(16);
+}
+
+function CRDefList({ title, items }) {
+  if (items != null) {
+    const itemElems = items.map((item) => {
+      return (
+        <div key={item.key} className="info-list-row">
+          <dt>{item.key}</dt>
+          <dd><code>{item.value ? item.value : '???'}</code></dd>
+        </div>
+      )
+    })
+    return (
+      <>
+        <p className="info-list-title">&sect; {title}</p>
+        <dl className="info-list">
+          { itemElems }
+        </dl>
+      </>
+    )
+  } else {
+    <p className="info-list-title">&sect; {title} - missing</p>
+  }
+}
+
+function CRInfoTabSummary({ fileContents }) {
+  if (fileContents) {
+    const processItems = fileContents.metadata ? [
+      { key: "Process ID", value: fileContents.metadata.process_id },
+      { key: "Process Timestamp:", value: fileContents.metadata.process_timestamp },
+      { key: "Dump Timestamp:", value: fileContents.metadata.dump_timestamp },
+    ] : null;
+
+    const systemItems = fileContents.system ? [
+      { key: "OS Build", value: fileContents.system.os_build },
+      { key: "OS Version", value: fileContents.system.os_version },
+      { key: "CPU Info", value: fileContents.system.cpu_ident },
+      { key: "CPU Count", value: fileContents.system.cpu_count },
+      { key: "CPU Microcode", value: fileContents.system.cpu_microcode },
+    ] : null;
+
+    const exceptionItems = fileContents.exception ? [
+      { key: "Reason", value: fileContents.exception.reason },
+      { key: "Address", value: asHex(fileContents.exception.address) },
+    ] : null;
+
+    return (
+      <>
+        <div>
+          <CRDefList title="Process metadata" items={processItems}/>
+          <CRDefList title="System info" items={systemItems}/>
+          <CRDefList title="Exception" items={exceptionItems}/>
+        </div>
+      </>
+    )
+  } else {
+    return (<></>)
+  }
+}
+
+function CRInfoTabModules({ fileContents }) {
+  const data = fileContents.modules
+  const columns = [
+    {
+      header: 'Path',
+      field: 'name',
+      rowHeader: true,
+    },
+    {
+      header: 'Image base',
+      field: 'image_base',
+      maxWidth: '140px',
+      renderCell: (row) => <code>{ asHex(row.image_base) }</code>,
+    },
+    {
+      header: 'Image size',
+      field: 'image_size',
+      maxWidth: '140px',
+      renderCell: (row) => <code>{ asHex(row.image_size) }</code>,
+    }
+  ]
+
   return (
     <>
-      Hello there!
+      <Table.Container>
+        <Table.Title as="h4">Loaded modules</Table.Title>
+        <Table.Subtitle as="p">Executables and dynamic libraries loaded into the crashed process.</Table.Subtitle>
+        <DataTable data={data} columns={columns}/>
+      </Table.Container>
     </>
   )
 }
 
-function CRInfoTabs({ fileInfo, fileContents }) {
+function CRInfoTabs({ fileContents }) {
   const [shownPage, setShownPage] = useState('summary')
 
   const pageTabs = [
-    { id: 'summary', title: 'Summary', renderContents: <CRIntoTabSummary fileInfo={fileInfo} /> },
+    { id: 'summary', title: 'Summary', renderContents: <CRInfoTabSummary fileContents={fileContents} /> },
     { id: 'call-stack', title: 'Call stack' },
     { id: 'other-threads', title: 'Other threads' },
-    { id: 'modules', title: 'Modules' },
+    { id: 'modules', title: 'Modules', renderContents: <CRInfoTabModules fileContents={fileContents} /> },
   ];
 
   const pageTabElems = pageTabs.map(function (tab) {
@@ -37,7 +125,7 @@ function CRInfoTabs({ fileInfo, fileContents }) {
   })
 
   return (
-    <div hidden={fileInfo == null && fileContents == null}>
+    <div hidden={fileContents == null}>
       <UnderlineNav aria-label="main">{ pageTabElems }</UnderlineNav>
       <PageLayout containerWidth='full'>
         <PageLayout.Content>{ pageTabs.find((tab) => tab.id === shownPage).renderContents }</PageLayout.Content>
@@ -47,7 +135,6 @@ function CRInfoTabs({ fileInfo, fileContents }) {
 }
 
 export default function CRUpload() {
-  const [fileInfo, setFileInfo] = useState(null)
   const [fileContents, setFileContents] = useState(null)
 
   const handleFileStart = (ec) => {
@@ -60,8 +147,6 @@ export default function CRUpload() {
         setFileContents(parsed)
         console.log(parsed)
       }
-
-      setFileInfo(file)
       reader.readAsArrayBuffer(file)
     }
   }
@@ -80,16 +165,23 @@ export default function CRUpload() {
           </PageHeader>
         </PageLayout.Header>
         <PageLayout.Content>
-          <FormControl required={true}>
-            <FormControl.Label>Input file</FormControl.Label>
-            <FormControl.Caption>This must have .dmp extension and might be quite big</FormControl.Caption>
-            <input type='file' onChange={handleFileStart}/>
-            {/* <FormControl.Validation variant='success'>A-okay!</FormControl.Validation> */}
-            {/* <FormControl.Validation variant='error'>Not a valid dump file.</FormControl.Validation> */}
-          </FormControl>
+          <div style={{ display: 'flex', flexDirection: 'row', columnGap: '4rem' }}>
+            <FormControl required={true}>
+              <FormControl.Label>Crash dump</FormControl.Label>
+              <FormControl.Caption>This file must have <code>.dmp</code> extension and be in <code>minidump</code> format.</FormControl.Caption>
+              <input type='file' onChange={handleFileStart} accept='.dmp'/>
+              {/* <FormControl.Validation variant='success'>A-okay!</FormControl.Validation> */}
+              {/* <FormControl.Validation variant='error'>Not a valid dump file.</FormControl.Validation> */}
+            </FormControl>
+            <FormControl>
+              <FormControl.Label>Application binary (optional)</FormControl.Label>
+              <FormControl.Caption>Optional <code>.exe</code> file to enrich output with assembly instructions.</FormControl.Caption>
+              <input type='file' onChange={handleFileStart} accept='.exe'/>
+            </FormControl>
+          </div>
         </PageLayout.Content>
       </PageLayout>
-      <CRInfoTabs fileInfo={fileInfo} fileContents={fileContents} />
+      <CRInfoTabs fileContents={fileContents} />
     </>
   )
 }
