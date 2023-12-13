@@ -2,6 +2,11 @@ import { BaseStyles, ThemeProvider, Header, Octicon } from '@primer/react'
 import { BugIcon } from '@primer/octicons-react'
 
 import CRUpload from './components/CRUpload'
+import init from 'wasm'
+
+
+// Initialize our WebAssembly logic.
+init()
 
 
 function App() {

@@ -3,39 +3,10 @@ import { useState } from 'react';
 import { Checkbox, CheckboxGroup, FormControl, PageLayout, Text, UnderlineNav } from '@primer/react'
 import { DataTable, PageHeader, Table } from '@primer/react/drafts'
 
-import './CRUpload.css'
-import init, { wa_parse_crash } from 'wasm'
+import { asHex, getFilename } from '../utils/strings';
+import { CRDefList } from './CRDefList';
+import { wa_parse_crash } from 'wasm'
 
-
-init()
-
-
-function asHex(number) {
-  return '0x' + number.toString(16);
-}
-
-function CRDefList({ title, items }) {
-  if (items != null) {
-    const itemElems = items.map((item) => {
-      return (
-        <div key={item.key} className="info-list-row">
-          <dt>{item.key}</dt>
-          <dd><code>{item.value ? item.value : '???'}</code></dd>
-        </div>
-      )
-    })
-    return (
-      <>
-        <p className="info-list-title">&sect; {title}</p>
-        <dl className="info-list">
-          { itemElems }
-        </dl>
-      </>
-    )
-  } else {
-    <p className="info-list-title">&sect; {title} - missing</p>
-  }
-}
 
 function CRInfoTabSummary({ fileContents }) {
   if (fileContents) {
@@ -77,9 +48,7 @@ function CRInfoTabCallstack({ fileContents }) {
   const [trimFilenames, setTrimFilenames] = useState(true);
   const [showDisassembly, setShowDisassembly] = useState(false);
 
-  const getFilename = trimFilenames
-    ? (path) => path.split('\\').pop().split('/').pop()
-    : (path) => path
+  const filename = trimFilenames ? getFilename : (path) => path
 
   // We can assume that the first thread is what crashed the program.
   const frameElements = fileContents.threads[0].frames
@@ -89,8 +58,8 @@ function CRInfoTabCallstack({ fileContents }) {
       return (
         <div key={frame.local_index}>
           <code>
-            <span className="frame-id">{ frame.local_index }.</span>
-            <strong>{ asHex(frame.instruction) }</strong> ({ getFilename(frame.module_name) })
+            <span style={{ display: 'inline-block', minWidth: '2rem' }}>{ frame.local_index }.</span>
+            <strong>{ asHex(frame.instruction) }</strong> ({ filename(frame.module_name) })
           </code>
         </div>
       )
