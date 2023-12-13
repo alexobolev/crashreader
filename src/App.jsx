@@ -23,7 +23,7 @@ function App() {
               <span>CrashReader</span>
             </Header.Link>
           </Header.Item>
-          <Header.Item full>v0.1.0</Header.Item>
+          <Header.Item full>by Alex Sobolev</Header.Item>
           <Header.Item sx={{ mr: 0 }}>
             <Header.Link href="https://github.com/alexobolev/crashreader">
               <span>Contribute on GitHub</span>

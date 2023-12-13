@@ -3,6 +3,11 @@ import { useState } from 'react';
 import { FormControl, PageLayout, Text, UnderlineNav } from '@primer/react'
 import { PageHeader } from '@primer/react/drafts'
 
+import init, { wa_parse_crash } from 'wasm'
+
+
+init()
+
 
 function CRIntoTabSummary({fileInfo}) {
   return (
@@ -49,8 +54,10 @@ export default function CRUpload() {
       const file = ec.target.files[0]
       const reader = new FileReader()
       reader.onload = (ev) => {
-        const buffer = ev.target.result
-        setFileContents(new Uint8Array(buffer))
+        const buffer = new Uint8Array(ev.target.result)
+        const parsed = wa_parse_crash(buffer)
+        setFileContents(parsed)
+        console.log(parsed)
       }
 
       setFileInfo(file)
