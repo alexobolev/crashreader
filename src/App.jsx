@@ -16,13 +16,12 @@ function App() {
     <ThemeProvider>
       <BaseStyles>
         <Header>
-          <Header.Item>
+          <Header.Item full>
             <Header.Link href="/" sx={{ fontSize: 2 }}>
               <Octicon icon={BugIcon} size={24} sx={{ mr: 2 }} />
               <span>CrashReader</span>
             </Header.Link>
           </Header.Item>
-          <Header.Item full>by Alex Sobolev</Header.Item>
           <Header.Item sx={{ mr: 0 }}>
             <Header.Link href="https://github.com/alexobolev/crashreader">
               <span>Contribute on GitHub</span>

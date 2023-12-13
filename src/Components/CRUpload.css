@@ -21,3 +21,8 @@ dl.info-list dd {
     flex: 1 1 auto;
     text-align: left;
 }
+
+div.frame-list span.frame-id {
+    display: inline-block;
+    min-width: 1.6rem;
+}

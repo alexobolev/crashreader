@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Checkbox, FormControl, PageLayout, Text, UnderlineNav } from '@primer/react'
+import { Checkbox, CheckboxGroup, FormControl, PageLayout, Text, UnderlineNav } from '@primer/react'
 import { DataTable, PageHeader, Table } from '@primer/react/drafts'
 
 import './CRUpload.css'
@@ -72,8 +72,97 @@ function CRInfoTabSummary({ fileContents }) {
   }
 }
 
+function CRInfoTabCallstack({ fileContents }) {
+  const firstThread = fileContents.threads[0];
+
+  const [trimFrames, setTrimFrames] = useState(true);
+  const [trimFilenames, setTrimFilenames] = useState(true);
+  const [showDisassembly, setShowDisassembly] = useState(false);
+
+  const frameFilter = trimFrames
+    ? (frame) => !frame.module_name.includes("Windows\\System32")
+    : (_) => true
+  const nameFilter = trimFilenames
+    ? (path) => path.split('\\').pop().split('/').pop()
+    : (path) => path
+
+  const indexedFrames = firstThread.frames.map((frame, index) => {
+    frame.local_index = index
+    return frame
+  })
+  const frameElements = indexedFrames.filter(frameFilter).map((frameInfo) => {
+    return (
+      <div key={frameInfo.local_index} style={{ marginBottom: '0.1rem' }}>
+        <code>
+          <span className="frame-id">{ frameInfo.local_index }.</span> <strong>{ asHex(frameInfo.instruction) }</strong> in { nameFilter(frameInfo.module_name) }
+        </code>
+      </div>
+    )
+  })
+
+  return (
+    <>
+      <CheckboxGroup sx={{ mb: 3 }}>
+        <CheckboxGroup.Label>Main stack frames' display options</CheckboxGroup.Label>
+        <FormControl>
+          <Checkbox defaultChecked={trimFrames} onChange={(e) => setTrimFrames(e.target.checked)} />
+          <FormControl.Label>Hide system stack frames</FormControl.Label>
+          <FormControl.Caption>Trim down the frame list to a comprehensible size.</FormControl.Caption>
+        </FormControl>
+        <FormControl>
+          <Checkbox defaultChecked={trimFilenames} onChange={(e) => setTrimFilenames(e.target.checked)} />
+          <FormControl.Label>Remove full module paths</FormControl.Label>
+          <FormControl.Caption>Display short filenames for each module instead of full paths.</FormControl.Caption>
+        </FormControl>
+        <FormControl disabled>
+          <Checkbox defaultChecked={showDisassembly} onChange={(e) => setShowDisassembly(e.target.checked)} />
+          <FormControl.Label>Display local assembly</FormControl.Label>
+          <FormControl.Caption>Attempt to disassemble a few bytes at each frame of the main module.</FormControl.Caption>
+        </FormControl>
+      </CheckboxGroup>
+      <div className="frame-list">
+        { frameElements }
+      </div>
+    </>
+  )
+}
+
+function CRInfoTabThreads({ fileContents }) {
+  const data = fileContents.threads
+  const columns = [
+    {
+      header: 'ID',
+      field: 'id',
+      rowHeader: true,
+    },
+    {
+      header: 'Name',
+      field: 'name',
+      renderCell: (row) => <span>{ row.name ? row.name : '-' }</span>,
+    },
+    {
+      header: 'Frame count',
+      field: 'frames',
+      renderCell: (row) => <span>{ row.frames.length }</span>,
+    },
+  ]
+
+  return (
+    <>
+      <Table.Container>
+        <Table.Title as="h4">Running threads</Table.Title>
+        <Table.Subtitle as="p">All threads which were executed or suspended by the application at the time of its crash.</Table.Subtitle>
+        <DataTable data={data} columns={columns}/>
+      </Table.Container>
+    </>
+  )
+}
+
 function CRInfoTabModules({ fileContents }) {
-  const data = fileContents.modules
+  const data = fileContents.modules.map((module) => {
+    module.id = module.name
+    return module
+  })
   const columns = [
     {
       header: 'Path',
@@ -110,8 +199,8 @@ function CRInfoTabs({ fileContents }) {
 
   const pageTabs = [
     { id: 'summary', title: 'Summary', renderContents: <CRInfoTabSummary fileContents={fileContents} /> },
-    { id: 'call-stack', title: 'Call stack' },
-    { id: 'other-threads', title: 'Other threads' },
+    { id: 'call-stack', title: 'Call stack', renderContents: <CRInfoTabCallstack fileContents={fileContents} /> },
+    { id: 'threads', title: 'All threads', renderContents: <CRInfoTabThreads fileContents={fileContents} /> },
     { id: 'modules', title: 'Modules', renderContents: <CRInfoTabModules fileContents={fileContents} /> },
   ];
 
