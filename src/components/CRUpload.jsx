@@ -11,6 +11,8 @@ import { wa_parse_crash } from 'wasm'
 function CRInfoTabSummary({ fileContents }) {
   if (fileContents) {
     const processItems = fileContents.metadata ? [
+      { key: "Main Module", value: fileContents.metadata.module_name },
+      { key: "Base Address", value: asHex(fileContents.metadata.module_base) },
       { key: "Process ID", value: fileContents.metadata.process_id },
       { key: "Process Timestamp:", value: fileContents.metadata.process_timestamp },
       { key: "Dump Timestamp:", value: fileContents.metadata.dump_timestamp },
@@ -43,7 +45,7 @@ function CRInfoTabSummary({ fileContents }) {
   }
 }
 
-function CRInfoTabCallstack({ fileContents }) {
+function CRInfoTabCallstack({ fileContents: crashInfo }) {
   const [trimFrames, setTrimFrames] = useState(true);
   const [trimFilenames, setTrimFilenames] = useState(true);
   const [showDisassembly, setShowDisassembly] = useState(false);
@@ -51,15 +53,19 @@ function CRInfoTabCallstack({ fileContents }) {
   const filename = trimFilenames ? getFilename : (path) => path
 
   // We can assume that the first thread is what crashed the program.
-  const frameElements = fileContents.threads[0].frames
+  const frameElements = crashInfo.threads[0].frames
     .map((frame, index) => { return { ...frame, local_index: index } })
     .filter(trimFrames ? (frame) => !frame.module_name.includes("Windows\\System32") : (_) => true)
     .map((frame) => {
+      const offsetElem = frame.module_name === crashInfo.metadata.module_name
+        ? asHex(frame.instruction - crashInfo.metadata.module_base)
+        : "???"
+
       return (
         <div key={frame.local_index}>
           <code>
             <span style={{ display: 'inline-block', minWidth: '2rem' }}>{ frame.local_index }.</span>
-            <strong>{ asHex(frame.instruction) }</strong> ({ filename(frame.module_name) })
+            <strong>{ asHex(frame.instruction) }</strong> ({ filename(frame.module_name) } + {offsetElem})
           </code>
         </div>
       )
@@ -158,14 +164,14 @@ function CRInfoTabModules({ fileContents }) {
   )
 }
 
-function CRInfoTabs({ fileContents }) {
+function CRInfoTabs({ crashInfo }) {
   const [shownPage, setShownPage] = useState('summary')
 
   const pageTabs = [
-    { id: 'summary', title: 'Summary', contents: <CRInfoTabSummary fileContents={fileContents} /> },
-    { id: 'call-stack', title: 'Call stack', contents: <CRInfoTabCallstack fileContents={fileContents} /> },
-    { id: 'threads', title: 'All threads', contents: <CRInfoTabThreads fileContents={fileContents} /> },
-    { id: 'modules', title: 'Modules', contents: <CRInfoTabModules fileContents={fileContents} /> },
+    { id: 'summary', title: 'Summary', contents: <CRInfoTabSummary fileContents={crashInfo} /> },
+    { id: 'call-stack', title: 'Call stack', contents: <CRInfoTabCallstack fileContents={crashInfo} /> },
+    { id: 'threads', title: 'All threads', contents: <CRInfoTabThreads fileContents={crashInfo} /> },
+    { id: 'modules', title: 'Modules', contents: <CRInfoTabModules fileContents={crashInfo} /> },
   ]
 
   const pageTabElems = pageTabs.map(function (tab) {
@@ -175,7 +181,7 @@ function CRInfoTabs({ fileContents }) {
   const pageTabContent = pageTabs.find((tab) => tab.id === shownPage).contents
 
   return (
-    <div hidden={fileContents == null}>
+    <div hidden={crashInfo == null}>
       <UnderlineNav aria-label="main">{ pageTabElems }</UnderlineNav>
       <PageLayout containerWidth='full'>
         <PageLayout.Content>{ pageTabContent }</PageLayout.Content>
@@ -185,17 +191,37 @@ function CRInfoTabs({ fileContents }) {
 }
 
 export default function CRUpload() {
-  const [fileContents, setFileContents] = useState(null)
+  const [crashBlob, setCrashBlob] = useState(null)
+  const [crashInfo, setCrashInfo] = useState(null)
+  const [exeBlob, setExeBlob] = useState(null)
 
-  const handleFileStart = (ec) => {
+  const updateCrashInfo = (crashBuffer, exeBuffer) => {
+    const parsed = wa_parse_crash(crashBuffer, exeBuffer)
+    setCrashInfo(parsed)
+    console.log(parsed)
+  }
+
+  const handleCrashFileStart = (ec) => {
     if (ec.target.files) {
       const file = ec.target.files[0]
       const reader = new FileReader()
       reader.onload = (ev) => {
         const buffer = new Uint8Array(ev.target.result)
-        const parsed = wa_parse_crash(buffer)
-        setFileContents(parsed)
-        console.log(parsed)
+        setCrashBlob(buffer)
+        updateCrashInfo(buffer, exeBlob)
+      }
+      reader.readAsArrayBuffer(file)
+    }
+  }
+
+  const handleExeFileStart = (ec) => {
+    if (ec.target.files) {
+      const file = ec.target.files[0]
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        const buffer = new Uint8Array(ev.target.result)
+        setExeBlob(buffer)
+        updateCrashInfo(crashBlob, buffer)
       }
       reader.readAsArrayBuffer(file)
     }
@@ -219,19 +245,19 @@ export default function CRUpload() {
             <FormControl required={true}>
               <FormControl.Label>Crash dump</FormControl.Label>
               <FormControl.Caption>This file must have <code>.dmp</code> extension and be in <code>minidump</code> format.</FormControl.Caption>
-              <input type='file' onChange={handleFileStart} accept='.dmp'/>
+              <input type='file' onChange={handleCrashFileStart} accept='.dmp'/>
               {/* <FormControl.Validation variant='success'>A-okay!</FormControl.Validation> */}
               {/* <FormControl.Validation variant='error'>Not a valid dump file.</FormControl.Validation> */}
             </FormControl>
-            <FormControl>
+            <FormControl disabled={crashInfo === null}>
               <FormControl.Label>Application binary (optional)</FormControl.Label>
               <FormControl.Caption>Optional <code>.exe</code> file to enrich output with assembly instructions.</FormControl.Caption>
-              <input type='file' onChange={handleFileStart} accept='.exe'/>
+              <input type='file' onChange={handleExeFileStart} accept='.exe' disabled={crashInfo === null}/>
             </FormControl>
           </div>
         </PageLayout.Content>
       </PageLayout>
-      <CRInfoTabs fileContents={fileContents} />
+      <CRInfoTabs crashInfo={crashInfo} />
     </>
   )
 }

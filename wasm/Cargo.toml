@@ -8,6 +8,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 breakpad-symbols = "0.19.1"
+goblin = { git = "https://github.com/m4b/goblin", default-features = false, features = ["std", "pe32", "pe64"] }
 minidump = "0.19.1"
 minidump-processor = { version = "0.19.1", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
