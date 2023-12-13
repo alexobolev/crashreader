@@ -13,11 +13,18 @@ pub struct CrashInfoMetadata {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct CrashInfoSystem {
-    pub os_build: String,
-    pub os_version: String,
-    pub cpu_ident: String,
+    pub os_build: Option<String>,
+    pub os_version: Option<String>,
+    pub cpu_ident: Option<String>,
     pub cpu_microcode: u64,
     pub cpu_count: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct CrashInfoModule {
+    pub name: String,
+    pub image_base: u64,
+    pub image_size: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -29,7 +36,7 @@ pub struct CrashInfoException {
 #[derive(Clone, Debug, Serialize)]
 pub struct CrashInfoThread {
     pub id: u32,
-    pub name: String,
+    pub name: Option<String>,
     pub dbg_info: String,
     pub frames: Vec<CrashInfoThreadFrame>,
 }
@@ -38,7 +45,7 @@ pub struct CrashInfoThread {
 pub struct CrashInfoThreadFrame {
     pub instruction: u64,
     pub resume_address: u64,
-    pub module_name: String,
+    pub module_name: Option<String>,
     pub trust: String,
 }
 
@@ -46,9 +53,10 @@ pub struct CrashInfoThreadFrame {
 pub struct CrashInfo {
     pub metadata: CrashInfoMetadata,
     pub system: CrashInfoSystem,
-    pub modules: Vec<String>,
+    pub modules: Vec<CrashInfoModule>,
     pub exception: Option<CrashInfoException>,
     pub threads: Vec<CrashInfoThread>,
+    pub thread_id: Option<u64>,
 }
 
 impl CrashInfo {
@@ -66,29 +74,34 @@ impl CrashInfo {
                 dump_timestamp: to_unix(process.time),
             },
             system: CrashInfoSystem {
-                os_build: process.system_info.os_build.unwrap_or_else(|| "unknown".into()),
-                os_version: process.system_info.os_version.unwrap_or_else(|| "unknown".into()),
-                cpu_ident: process.system_info.cpu_info.unwrap_or_else(|| "unknown".into()),
+                os_build: process.system_info.os_build,
+                os_version: process.system_info.os_version,
+                cpu_ident: process.system_info.cpu_info,
                 cpu_microcode: process.system_info.cpu_microcode_version.unwrap_or(u64::MIN),
                 cpu_count: process.system_info.cpu_count as u64,
             },
-            modules: process.modules.iter().map(|module| module.name.clone()).collect(),
+            modules: process.modules.iter().map(|module| CrashInfoModule {
+                name: module.name.clone(),
+                image_base: module.raw.base_of_image,
+                image_size: module.raw.size_of_image,
+            }).collect(),
             exception: process.exception_info.map(|exception| CrashInfoException {
                 reason: exception.reason.to_string(),
                 address: exception.address.0,
             }),
             threads: process.threads.iter().map(|callstack| CrashInfoThread {
                 id: callstack.thread_id,
-                name: callstack.thread_name.clone().unwrap_or_else(|| "unknown".into()),
+                name: callstack.thread_name.clone(),
                 dbg_info: format!("{:?}", callstack.info),
                 frames: callstack.frames.iter().map(|frame| CrashInfoThreadFrame {
                     instruction: frame.instruction,
                     resume_address: frame.resume_address,
                     module_name: frame.module.clone()
-                        .map(|module| module.name).unwrap_or_else(|| "unknown".into()),
+                        .map(|module| module.name),
                     trust: frame.trust.as_str().into(),
                 }).collect(),
-            }).collect()
+            }).collect(),
+            thread_id: process.requesting_thread.map(|id| id as u64),
         }
     }
 }

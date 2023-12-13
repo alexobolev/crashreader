@@ -23,7 +23,8 @@ function CRInfoTabs({ fileInfo, fileContents }) {
   const pageTabs = [
     { id: 'summary', title: 'Summary', renderContents: <CRIntoTabSummary fileInfo={fileInfo} /> },
     { id: 'call-stack', title: 'Call stack' },
-    { id: 'threads', title: 'Thread info' },
+    { id: 'other-threads', title: 'Other threads' },
+    { id: 'modules', title: 'Modules' },
   ];
 
   const pageTabElems = pageTabs.map(function (tab) {
