@@ -23,7 +23,12 @@ fn parse_crash(crash_slice: &[u8], exe_slice: &[u8]) -> Result<CrashInfo, String
     let exe_info = PE::parse_with_opts(exe_slice, &opts)
         .map_err(|err| err.to_string())?;
 
-    Ok(CrashInfo::new(crash_info, exe_info, exe_slice))
+    let digest = CrashInfo::new(crash_info, exe_info, exe_slice);
+    if digest.checksum_dump != digest.checksum_exe {
+        Err(String::from("crash dump was not generated from provided executable"))?;
+    }
+
+    Ok(digest)
 }
 
 #[wasm_bindgen]

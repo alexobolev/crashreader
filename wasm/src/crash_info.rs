@@ -105,6 +105,9 @@ pub struct CrashInfo {
     pub threads: Vec<CrashInfoThread>,
     pub thread_id: Option<u64>,
     pub executable: ExeInfo,
+
+    pub checksum_dump: u32,
+    pub checksum_exe: u32,
 }
 
 impl CrashInfo {
@@ -217,6 +220,10 @@ impl CrashInfo {
                     ptr_raw: section.pointer_to_raw_data as u64,
                 }).collect(),
             },
+            checksum_dump: first_module.raw.checksum,
+            checksum_exe: exe_info.header.optional_header
+                .map(|header| header.windows_fields.check_sum)
+                .unwrap_or_default(),
         };
 
         // Now that the digest is built, enrich it with disassembly.

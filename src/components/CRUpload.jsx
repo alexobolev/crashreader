@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Checkbox, CheckboxGroup, FormControl, PageLayout, Text, UnderlineNav } from '@primer/react'
+import { Checkbox, CheckboxGroup, Flash, FormControl, Heading, PageLayout, Text, UnderlineNav } from '@primer/react'
 import { DataTable, PageHeader, Table } from '@primer/react/drafts'
 
 import { asHex, getFilename } from '../utils/strings';
@@ -214,16 +214,34 @@ function CRInfoTabs({ crashInfo }) {
   )
 }
 
+function CRInfoError({ errorText }) {
+  return (
+    <PageLayout containerWidth='full'>
+      <PageLayout.Content sx={{ color: 'severe.fg' }}>
+        <h3 style={{ marginTop: 0 }}>Error occurred:</h3>
+        <Flash variant='danger'><code>{errorText}</code></Flash>
+      </PageLayout.Content>
+    </PageLayout>
+  )
+}
+
 export default function CRUpload() {
   const [crashBlob, setCrashBlob] = useState(null)
   const [crashInfo, setCrashInfo] = useState(null)
   const [exeBlob, setExeBlob] = useState(null)
+  const [parseError, setParseError] = useState(null)
 
   const updateCrashInfo = (crashBuffer, exeBuffer) => {
     if (crashBuffer !== null && exeBuffer !== null) {
-      const parsed = wa_parse_crash(crashBuffer, exeBuffer)
-      setCrashInfo(parsed)
-      console.log(parsed)
+      try {
+        const parsed = wa_parse_crash(crashBuffer, exeBuffer)
+        setCrashInfo(parsed)
+        setParseError(null)
+        console.log(parsed)
+      } catch (error) {
+        setCrashInfo(null)
+        setParseError(error)
+      }
     }
   }
 
@@ -281,7 +299,8 @@ export default function CRUpload() {
           </div>
         </PageLayout.Content>
       </PageLayout>
-      <CRInfoTabs crashInfo={crashInfo} />
+      { crashInfo ? (<CRInfoTabs crashInfo={crashInfo} />) : (<></>) }
+      { parseError ? (<CRInfoError errorText={parseError} />) : (<></>) }
     </>
   )
 }
