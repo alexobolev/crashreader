@@ -21,7 +21,7 @@ function App() {
             </Header.Link>
           </Header.Item>
           <Header.Item sx={{ mr: 0 }}>
-            <Header.Link href="https://github.com/alexobolev/crashreader">
+            <Header.Link href="https://github.com/alexobolev/crashreader" target='_blank'>
               <span>Contribute on GitHub</span>
             </Header.Link>
           </Header.Item>

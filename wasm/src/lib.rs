@@ -4,6 +4,8 @@ use minidump_processor::process_minidump;
 use wasm_bindgen::prelude::*;
 
 mod crash_info;
+mod disassembler;
+
 pub use crash_info::CrashInfo;
 
 
@@ -21,7 +23,7 @@ fn parse_crash(crash_slice: &[u8], exe_slice: &[u8]) -> Result<CrashInfo, String
     let exe_info = PE::parse_with_opts(exe_slice, &opts)
         .map_err(|err| err.to_string())?;
 
-    Ok(CrashInfo::new(crash_info, exe_info))
+    Ok(CrashInfo::new(crash_info, exe_info, exe_slice))
 }
 
 #[wasm_bindgen]

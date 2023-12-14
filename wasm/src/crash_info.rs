@@ -1,9 +1,12 @@
+// use std::fmt::Write;
 use std::time::{UNIX_EPOCH, SystemTime};
 
 use goblin::pe::PE;
 use minidump::MinidumpModule;
 use minidump_processor::ProcessState;
 use serde::Serialize;
+
+use crate::disassembler::Disassembler;
 
 
 #[derive(Clone, Debug, Serialize)]
@@ -52,6 +55,7 @@ pub struct CrashInfoThreadFrame {
     pub module_name: Option<String>,
     pub trust: String,
     pub resolved_rva: Option<u64>,
+    pub resolved_disasm: Option<Vec<(usize, String)>>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -88,6 +92,7 @@ pub struct ExeInfoSection {
     pub name: String,
     pub size: u64,
     pub offset: u64,
+    pub ptr_raw: u64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -102,31 +107,37 @@ pub struct CrashInfo {
 }
 
 impl CrashInfo {
-    pub fn new(crash_info: ProcessState, exe_info: PE<'_>) -> Self {
-        let to_unix = |timestamp: SystemTime| -> u64 {
-            timestamp.duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_millis() as u64)
-                .unwrap_or(u64::MIN)
-        };
+    pub fn new(crash_info: ProcessState, exe_info: PE<'_>, exe_slice: &[u8]) -> Self {
+        // We'll calculate call frame RVAs, but only within the main module.
+        let first_module = crash_info.modules.main_module()
+            .expect("failed to find main module");
 
-        let first_module = crash_info.modules.main_module().unwrap();
-        let is_main_module = |module: &MinidumpModule| {
-            module.raw.checksum == first_module.raw.checksum
-        };
-        let resolve_rva = |module: &MinidumpModule, address: u64| -> Option<u64> {
-            if is_main_module(module) {
+        // We'll filter out main module call frames not in the .text section.
+        let text_section = exe_info.sections.iter()
+            .find(|section| matches!(section.name(), Ok(".text")))
+            .expect("failed to find .text section");
+
+        // Offset to subtract from RVA to get offset into executable.
+        let exe_to_rva_offset = text_section.virtual_address as usize
+            - text_section.pointer_to_raw_data as usize;
+
+        // Calculates relative `address` if it's in the main `module`.
+        let resolve_rva = |module: &MinidumpModule, address: u64| {
+            if module.raw.checksum == first_module.raw.checksum {
                 Some(address - module.raw.base_of_image)
             } else {
                 None
             }
         };
 
-        // We'll use .text size to filter out irrelevant call frames.
-        let text_section = exe_info.sections.iter()
-            .find(|section| matches!(section.name(), Ok(".text")))
-            .expect("failed to find .text section");
+        // Converts a `SystemTime` to a unix timestamp (in milliseconds).
+        let to_unix = |timestamp: SystemTime| {
+            timestamp.duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_millis() as u64)
+                .unwrap_or(u64::MIN)
+        };
 
-        Self {
+        let mut digest = Self {
             metadata: CrashInfoMetadata {
                 module_name: first_module.name.clone(),
                 module_base: first_module.raw.base_of_image,
@@ -164,6 +175,7 @@ impl CrashInfo {
                         resolved_rva: frame.module.as_ref()
                             .map(|module| resolve_rva(module, frame.resume_address))
                             .flatten(),
+                        resolved_disasm: None,
                     })
                     .filter(|frame| {
                         if let Some(rva) = frame.resolved_rva {
@@ -200,8 +212,42 @@ impl CrashInfo {
                     name: section.name().map(|s| s.to_string()).unwrap_or_default(),
                     size: section.virtual_size as u64,
                     offset: section.virtual_address as u64,
+                    ptr_raw: section.pointer_to_raw_data as u64,
                 }).collect(),
             },
+        };
+
+        // Now that the digest is built, enrich it with disassembly.
+        let first_thread_rec = digest.threads.first_mut().unwrap();
+        for frame_rec in first_thread_rec.frames.iter_mut() {
+            if let Some(rva) = frame_rec.resolved_rva {
+                const PRE_OFFSET: usize = 18;
+                const POST_OFFSET: usize = 24;
+
+                let pre_bound = (rva as usize - exe_to_rva_offset).saturating_sub(PRE_OFFSET);
+                let post_bound = (rva as usize - exe_to_rva_offset).saturating_add(POST_OFFSET);
+
+                let around_slice = exe_slice.get(pre_bound .. post_bound)
+                    .expect("failed to get surrounding binary slice for frame");
+
+                // {
+                //     let mut debug_string = String::new();
+                //     debug_string.reserve(around_slice.len() * 3);
+                //     for byte in around_slice {
+                //         write!(&mut debug_string, "{:02X} ",byte).unwrap();
+                //     }
+                //     frame_rec.resolved_disasm = Some(vec![debug_string])
+                // }
+
+                let mut disassember = Disassembler::new(
+                    around_slice, PRE_OFFSET, exe_info.is_64,
+                );
+
+                let rip = frame_rec.instruction - PRE_OFFSET as u64;
+                frame_rec.resolved_disasm = disassember.format_valid(rip);
+            }
         }
+
+        digest
     }
 }

@@ -66,11 +66,27 @@ function CRInfoTabCallstack({ crashInfo }) {
     .map((frame) => {
       const offsetElement = frame.resolved_rva ? asHex(frame.resolved_rva) : '???'
       const frameOpacity = frame.resolved_rva ? 1 : 0.7;
+
+      const disasmElement = (frame.resolved_disasm)
+        ? <div style={{
+            display: 'block',
+            margin: '0.5rem 1.5rem',
+            padding: '0.5rem 0',
+            lineHeight: '1.4',
+            backgroundColor: '#f2f2f2',
+          }}>
+            {frame.resolved_disasm.map((tuple) => (
+              <code key={tuple[0]} style={{ display: 'block', padding: '0 0.5rem' }}>{tuple[1]}</code>
+            ))}
+          </div>
+        : <></>
+
       return (
         <div key={frame.local_index}>
           <code style={{ opacity: frameOpacity }}>
             <span style={{ display: 'inline-block', minWidth: '2rem' }}>{ frame.local_index }.</span>
             <strong>{ asHex(frame.resume_address) }</strong> ({ filename(frame.module_name) } + {offsetElement})
+            {disasmElement}
           </code>
         </div>
       )
@@ -82,7 +98,7 @@ function CRInfoTabCallstack({ crashInfo }) {
         <CheckboxGroup.Label>Display options</CheckboxGroup.Label>
         <FormControl>
           <Checkbox defaultChecked={trimFrames} onChange={(e) => setTrimFrames(e.target.checked)} />
-          <FormControl.Label>Hide stack frames outside the main module</FormControl.Label>
+          <FormControl.Label>Hide call frames not in the main module</FormControl.Label>
           <FormControl.Caption>Trim down the frame list to a comprehensible size.</FormControl.Caption>
         </FormControl>
         <FormControl>
