@@ -8,33 +8,41 @@ import { CRDefList } from './CRDefList';
 import { wa_parse_crash } from 'wasm'
 
 
-function CRInfoTabSummary({ fileContents }) {
-  if (fileContents) {
-    const processItems = fileContents.metadata ? [
-      { key: "Main Module", value: fileContents.metadata.module_name },
-      { key: "Base Address", value: asHex(fileContents.metadata.module_base) },
-      { key: "Process ID", value: fileContents.metadata.process_id },
-      { key: "Process Timestamp:", value: fileContents.metadata.process_timestamp },
-      { key: "Dump Timestamp:", value: fileContents.metadata.dump_timestamp },
+function CRInfoTabSummary({ crashInfo }) {
+  if (crashInfo) {
+    const processItems = crashInfo.metadata ? [
+      { key: "Main Module", value: crashInfo.metadata.module_name },
+      { key: "Base Address", value: asHex(crashInfo.metadata.module_base) },
+      { key: "Process ID", value: crashInfo.metadata.process_id },
+      { key: "Process Timestamp:", value: crashInfo.metadata.process_timestamp },
+      { key: "Dump Timestamp:", value: crashInfo.metadata.dump_timestamp },
     ] : null;
 
-    const systemItems = fileContents.system ? [
-      { key: "OS Build", value: fileContents.system.os_build },
-      { key: "OS Version", value: fileContents.system.os_version },
-      { key: "CPU Info", value: fileContents.system.cpu_ident },
-      { key: "CPU Count", value: fileContents.system.cpu_count },
-      { key: "CPU Microcode", value: fileContents.system.cpu_microcode },
+    const executableItems = crashInfo.executable ? [
+      { key: "Module Name", value: crashInfo.executable.name },
+      { key: "Architecture", value: crashInfo.executable.is_64bit ? 'AMD64' : 'x86' },
+      { key: "Image Base", value: asHex(crashInfo.executable.image_base) },
+      { key: "Entry Point", value: asHex(crashInfo.executable.entry_point) },
     ] : null;
 
-    const exceptionItems = fileContents.exception ? [
-      { key: "Reason", value: fileContents.exception.reason },
-      { key: "Address", value: asHex(fileContents.exception.address) },
+    const systemItems = crashInfo.system ? [
+      { key: "OS Build", value: crashInfo.system.os_build },
+      { key: "OS Version", value: crashInfo.system.os_version },
+      { key: "CPU Info", value: crashInfo.system.cpu_ident },
+      { key: "CPU Count", value: crashInfo.system.cpu_count },
+      { key: "CPU Microcode", value: crashInfo.system.cpu_microcode },
+    ] : null;
+
+    const exceptionItems = crashInfo.exception ? [
+      { key: "Reason", value: crashInfo.exception.reason },
+      { key: "Address", value: asHex(crashInfo.exception.address) },
     ] : null;
 
     return (
       <>
         <div>
           <CRDefList title="Process metadata" items={processItems}/>
+          <CRDefList title="Executable info" items={executableItems}/>
           <CRDefList title="System info" items={systemItems}/>
           <CRDefList title="Exception" items={exceptionItems}/>
         </div>
@@ -45,10 +53,9 @@ function CRInfoTabSummary({ fileContents }) {
   }
 }
 
-function CRInfoTabCallstack({ fileContents: crashInfo }) {
+function CRInfoTabCallstack({ crashInfo }) {
   const [trimFrames, setTrimFrames] = useState(true);
   const [trimFilenames, setTrimFilenames] = useState(true);
-  const [showDisassembly, setShowDisassembly] = useState(false);
 
   const filename = trimFilenames ? getFilename : (path) => path
 
@@ -57,13 +64,13 @@ function CRInfoTabCallstack({ fileContents: crashInfo }) {
     .map((frame, index) => { return { ...frame, local_index: index } })
     .filter(trimFrames ? (frame) => frame.resolved_rva !== undefined : (_) => true)
     .map((frame) => {
-      const offsetElem = frame.resolved_rva ? asHex(frame.resolved_rva) : '???'
-      const elemOpacity = frame.resolved_rva ? 1 : 0.7;
+      const offsetElement = frame.resolved_rva ? asHex(frame.resolved_rva) : '???'
+      const frameOpacity = frame.resolved_rva ? 1 : 0.7;
       return (
         <div key={frame.local_index}>
-          <code style={{ opacity: elemOpacity }}>
+          <code style={{ opacity: frameOpacity }}>
             <span style={{ display: 'inline-block', minWidth: '2rem' }}>{ frame.local_index }.</span>
-            <strong>{ asHex(frame.instruction) }</strong> ({ filename(frame.module_name) } + {offsetElem})
+            <strong>{ asHex(frame.resume_address) }</strong> ({ filename(frame.module_name) } + {offsetElement})
           </code>
         </div>
       )
@@ -83,11 +90,6 @@ function CRInfoTabCallstack({ fileContents: crashInfo }) {
           <FormControl.Label>Remove full module paths</FormControl.Label>
           <FormControl.Caption>Display short filenames for each module instead of full paths.</FormControl.Caption>
         </FormControl>
-        <FormControl disabled>
-          <Checkbox defaultChecked={showDisassembly} onChange={(e) => setShowDisassembly(e.target.checked)} />
-          <FormControl.Label>Display local assembly</FormControl.Label>
-          <FormControl.Caption>Attempt to disassemble a few bytes at each frame of the main module.</FormControl.Caption>
-        </FormControl>
       </CheckboxGroup>
       <div className="frame-list">
         { frameElements }
@@ -96,8 +98,8 @@ function CRInfoTabCallstack({ fileContents: crashInfo }) {
   )
 }
 
-function CRInfoTabThreads({ fileContents }) {
-  const data = fileContents.threads
+function CRInfoTabThreads({ crashInfo }) {
+  const data = crashInfo.threads
   const columns = [
     {
       header: 'ID',
@@ -127,8 +129,8 @@ function CRInfoTabThreads({ fileContents }) {
   )
 }
 
-function CRInfoTabModules({ fileContents }) {
-  const data = fileContents.modules.map((module) => {
+function CRInfoTabModules({ crashInfo }) {
+  const data = crashInfo.modules.map((module) => {
     return { ...module, id: module.name }
   })
   const columns = [
@@ -166,10 +168,10 @@ function CRInfoTabs({ crashInfo }) {
   const [shownPage, setShownPage] = useState('summary')
 
   const pageTabs = [
-    { id: 'summary', title: 'Summary', contents: <CRInfoTabSummary fileContents={crashInfo} /> },
-    { id: 'call-stack', title: 'Call stack', contents: <CRInfoTabCallstack fileContents={crashInfo} /> },
-    { id: 'threads', title: 'All threads', contents: <CRInfoTabThreads fileContents={crashInfo} /> },
-    { id: 'modules', title: 'Modules', contents: <CRInfoTabModules fileContents={crashInfo} /> },
+    { id: 'summary', title: 'Summary', contents: <CRInfoTabSummary crashInfo={crashInfo} /> },
+    { id: 'call-stack', title: 'Call stack', contents: <CRInfoTabCallstack crashInfo={crashInfo} /> },
+    { id: 'threads', title: 'All threads', contents: <CRInfoTabThreads crashInfo={crashInfo} /> },
+    { id: 'modules', title: 'Modules', contents: <CRInfoTabModules crashInfo={crashInfo} /> },
   ]
 
   const pageTabElems = pageTabs.map(function (tab) {
@@ -194,9 +196,11 @@ export default function CRUpload() {
   const [exeBlob, setExeBlob] = useState(null)
 
   const updateCrashInfo = (crashBuffer, exeBuffer) => {
-    const parsed = wa_parse_crash(crashBuffer, exeBuffer)
-    setCrashInfo(parsed)
-    console.log(parsed)
+    if (crashBuffer !== null && exeBuffer !== null) {
+      const parsed = wa_parse_crash(crashBuffer, exeBuffer)
+      setCrashInfo(parsed)
+      console.log(parsed)
+    }
   }
 
   const handleCrashFileStart = (ec) => {
@@ -242,15 +246,13 @@ export default function CRUpload() {
           <div style={{ display: 'flex', flexDirection: 'row', columnGap: '4rem' }}>
             <FormControl required={true}>
               <FormControl.Label>Crash dump</FormControl.Label>
-              <FormControl.Caption>This file must have <code>.dmp</code> extension and be in <code>minidump</code> format.</FormControl.Caption>
+              <FormControl.Caption>The crash <code>.dmp</code> file in <code>minidump</code> format.</FormControl.Caption>
               <input type='file' onChange={handleCrashFileStart} accept='.dmp'/>
-              {/* <FormControl.Validation variant='success'>A-okay!</FormControl.Validation> */}
-              {/* <FormControl.Validation variant='error'>Not a valid dump file.</FormControl.Validation> */}
             </FormControl>
-            <FormControl disabled={crashInfo === null}>
-              <FormControl.Label>Application binary (optional)</FormControl.Label>
-              <FormControl.Caption>Optional <code>.exe</code> file to enrich output with assembly instructions.</FormControl.Caption>
-              <input type='file' onChange={handleExeFileStart} accept='.exe' disabled={crashInfo === null}/>
+            <FormControl required={true}>
+              <FormControl.Label>Application binary</FormControl.Label>
+              <FormControl.Caption>Non-DRM-encumbered <code>.exe</code> file to enrich and filter output.</FormControl.Caption>
+              <input type='file' onChange={handleExeFileStart} accept='.exe' />
             </FormControl>
           </div>
         </PageLayout.Content>

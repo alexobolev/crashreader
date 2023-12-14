@@ -98,11 +98,11 @@ pub struct CrashInfo {
     pub exception: Option<CrashInfoException>,
     pub threads: Vec<CrashInfoThread>,
     pub thread_id: Option<u64>,
-    pub executable: Option<ExeInfo>,
+    pub executable: ExeInfo,
 }
 
 impl CrashInfo {
-    pub fn new(crash_info: ProcessState, exe_info: Option<PE<'_>>) -> Self {
+    pub fn new(crash_info: ProcessState, exe_info: PE<'_>) -> Self {
         let to_unix = |timestamp: SystemTime| -> u64 {
             timestamp.duration_since(UNIX_EPOCH)
                 .map(|duration| duration.as_millis() as u64)
@@ -153,23 +153,23 @@ impl CrashInfo {
                         .map(|module| module.name),
                     trust: frame.trust.as_str().into(),
                     resolved_rva: frame.module.as_ref()
-                        .map(|module| resolve_rva(module, frame.instruction))
+                        .map(|module| resolve_rva(module, frame.resume_address))
                         .flatten(),
                 }).collect(),
             }).collect(),
             thread_id: crash_info.requesting_thread.map(|id| id as u64),
-            executable: exe_info.map(|pe| ExeInfo {
-                name: pe.name.map(|s| s.to_string()),
-                is_64bit: pe.is_64,
-                entry_point: pe.entry as u64,
-                image_base: pe.image_base as u64,
-                exports: pe.exports.iter().map(|export| ExeInfoExport {
+            executable: ExeInfo {
+                name: exe_info.name.map(|s| s.to_string()),
+                is_64bit: exe_info.is_64,
+                entry_point: exe_info.entry as u64,
+                image_base: exe_info.image_base as u64,
+                exports: exe_info.exports.iter().map(|export| ExeInfoExport {
                     name: export.name.map(|s| s.to_string()),
                     offset: export.offset.map(|n| n as u64),
                     rva: export.rva as u64,
                     size: export.size as u64,
                 }).collect(),
-                imports: pe.imports.iter().map(|import| ExeInfoImport {
+                imports: exe_info.imports.iter().map(|import| ExeInfoImport {
                     name: import.name.to_string(),
                     dll_name: import.dll.to_string(),
                     ordinal: import.ordinal,
@@ -177,12 +177,12 @@ impl CrashInfo {
                     rva: import.rva as u64,
                     size: import.size as u64,
                 }).collect(),
-                sections: pe.sections.iter().map(|section| ExeInfoSection {
+                sections: exe_info.sections.iter().map(|section| ExeInfoSection {
                     name: section.name().map(|s| s.to_string()).unwrap_or_default(),
                     size: section.virtual_size as u64,
                     offset: section.virtual_address as u64,
                 }).collect(),
-            }),
+            },
         }
     }
 }
