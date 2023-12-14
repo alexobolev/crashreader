@@ -75,9 +75,17 @@ function CRInfoTabCallstack({ crashInfo }) {
             lineHeight: '1.4',
             backgroundColor: '#f2f2f2',
           }}>
-            {frame.resolved_disasm.map((tuple) => (
-              <code key={tuple[0]} style={{ display: 'block', padding: '0 0.5rem' }}>{tuple[1]}</code>
-            ))}
+            {frame.resolved_disasm.map(function(tuple, index) {
+              let background = 'default'
+              if (index == 0) { background = 'lightyellow' }
+              if (tuple[0] == frame.resolved_disasm_sel) { background = 'lightblue' }
+
+              return (<code key={index} style={{
+                display: 'block',
+                padding: '0 0.5rem',
+                backgroundColor: background,
+              }}>{tuple[1]}</code>)
+            })}
           </div>
         : <></>
 

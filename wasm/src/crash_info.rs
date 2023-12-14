@@ -56,6 +56,7 @@ pub struct CrashInfoThreadFrame {
     pub trust: String,
     pub resolved_rva: Option<u64>,
     pub resolved_disasm: Option<Vec<(usize, String)>>,
+    pub resolved_disasm_sel: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -176,6 +177,7 @@ impl CrashInfo {
                             .map(|module| resolve_rva(module, frame.resume_address))
                             .flatten(),
                         resolved_disasm: None,
+                        resolved_disasm_sel: 0,
                     })
                     .filter(|frame| {
                         if let Some(rva) = frame.resolved_rva {
@@ -221,8 +223,8 @@ impl CrashInfo {
         let first_thread_rec = digest.threads.first_mut().unwrap();
         for frame_rec in first_thread_rec.frames.iter_mut() {
             if let Some(rva) = frame_rec.resolved_rva {
-                const PRE_OFFSET: usize = 18;
-                const POST_OFFSET: usize = 24;
+                const PRE_OFFSET: usize = 16;
+                const POST_OFFSET: usize = 20;
 
                 let pre_bound = (rva as usize - exe_to_rva_offset).saturating_sub(PRE_OFFSET);
                 let post_bound = (rva as usize - exe_to_rva_offset).saturating_add(POST_OFFSET);
@@ -243,8 +245,9 @@ impl CrashInfo {
                     around_slice, PRE_OFFSET, exe_info.is_64,
                 );
 
-                let rip = frame_rec.instruction - PRE_OFFSET as u64;
+                let rip = frame_rec.resume_address - PRE_OFFSET as u64;
                 frame_rec.resolved_disasm = disassember.format_valid(rip);
+                frame_rec.resolved_disasm_sel = PRE_OFFSET;
             }
         }
 
