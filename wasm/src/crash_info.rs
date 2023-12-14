@@ -110,13 +110,21 @@ impl CrashInfo {
         };
 
         let first_module = crash_info.modules.main_module().unwrap();
+        let is_main_module = |module: &MinidumpModule| {
+            module.raw.checksum == first_module.raw.checksum
+        };
         let resolve_rva = |module: &MinidumpModule, address: u64| -> Option<u64> {
-            if module.raw.checksum == first_module.raw.checksum {
+            if is_main_module(module) {
                 Some(address - module.raw.base_of_image)
             } else {
                 None
             }
         };
+
+        // We'll use .text size to filter out irrelevant call frames.
+        let text_section = exe_info.sections.iter()
+            .find(|section| matches!(section.name(), Ok(".text")))
+            .expect("failed to find .text section");
 
         Self {
             metadata: CrashInfoMetadata {
@@ -146,16 +154,27 @@ impl CrashInfo {
                 id: callstack.thread_id,
                 name: callstack.thread_name.clone(),
                 dbg_info: format!("{:?}", callstack.info),
-                frames: callstack.frames.iter().map(|frame| CrashInfoThreadFrame {
-                    instruction: frame.instruction,
-                    resume_address: frame.resume_address,
-                    module_name: frame.module.clone()
-                        .map(|module| module.name),
-                    trust: frame.trust.as_str().into(),
-                    resolved_rva: frame.module.as_ref()
-                        .map(|module| resolve_rva(module, frame.resume_address))
-                        .flatten(),
-                }).collect(),
+                frames: callstack.frames.iter()
+                    .map(|frame| CrashInfoThreadFrame {
+                        instruction: frame.instruction,
+                        resume_address: frame.resume_address,
+                        module_name: frame.module.clone()
+                            .map(|module| module.name),
+                        trust: frame.trust.as_str().into(),
+                        resolved_rva: frame.module.as_ref()
+                            .map(|module| resolve_rva(module, frame.resume_address))
+                            .flatten(),
+                    })
+                    .filter(|frame| {
+                        if let Some(rva) = frame.resolved_rva {
+                            // The main module must only contain frames within .text section.
+                            rva <= text_section.virtual_size as u64
+                        } else {
+                            // Other modules are not filtered.
+                            true
+                        }
+                    })
+                    .collect(),
             }).collect(),
             thread_id: crash_info.requesting_thread.map(|id| id as u64),
             executable: ExeInfo {

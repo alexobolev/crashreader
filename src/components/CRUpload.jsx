@@ -243,7 +243,7 @@ export default function CRUpload() {
           </PageHeader>
         </PageLayout.Header>
         <PageLayout.Content>
-          <div style={{ display: 'flex', flexDirection: 'row', columnGap: '4rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'row', columnGap: '2rem' }}>
             <FormControl required={true}>
               <FormControl.Label>Crash dump</FormControl.Label>
               <FormControl.Caption>The crash <code>.dmp</code> file in <code>minidump</code> format.</FormControl.Caption>
