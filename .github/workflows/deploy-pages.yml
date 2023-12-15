@@ -1,0 +1,54 @@
+name: "Build and deploy to pages"
+on:
+  push:
+    branches: ['main']
+    paths-ignore:
+      - 'build/**'
+      - .dockerignore
+      - Dockerfile
+  workflow_dispatch:
+jobs:
+  build-app:
+    name: Build application
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/alexobolev/crashreader-env:main
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      volumes:
+        - .:/usr/src/build
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Remove package-lock.json (temporary)
+        run: |
+          rm ./package-lock.json || true
+      - name: Build wasm core module
+        run: |
+          npm run wasm
+      - name: Install dependencies from package.json
+        run: |
+          npm install
+      - name: Build .js project
+        run: |
+          npm run build
+      - name: Upload built files
+        uses: actions/upload-artifact@v4
+        with:
+          name: crashreader-dist
+          path: dist/
+  deploy-pages:
+    name: Deploy pages
+    runs-on: ubuntu-latest
+    needs: build-app
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to pages
+        id: deployment
+        uses: actions/deploy-pages@v3
