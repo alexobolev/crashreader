@@ -15,7 +15,7 @@ function App() {
       <BaseStyles>
         <Header>
           <Header.Item full>
-            <Header.Link href="/" sx={{ fontSize: 2 }}>
+            <Header.Link href="#" sx={{ fontSize: 2 }}>
               <Octicon icon={BugIcon} size={24} sx={{ mr: 3 }} />
               <span>CrashReader</span>
             </Header.Link>
