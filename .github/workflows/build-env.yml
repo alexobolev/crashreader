@@ -2,6 +2,10 @@ name: "Publish a build environment"
 on:
   push:
     branches: ['main']
+    paths:
+      - 'build/**'
+      - .dockerignore
+      - Dockerfile
   workflow_dispatch:
 env:
   REGISTRY: ghcr.io
