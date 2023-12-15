@@ -7,8 +7,6 @@ on:
       - .dockerignore
       - Dockerfile
   workflow_dispatch:
-env:
-  ARTIFACT_NAME: crashreader-dist
 jobs:
   build-app:
     name: Build application
@@ -38,7 +36,7 @@ jobs:
       - name: Upload built files
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: github-pages
           path: dist/
   deploy-pages:
     name: Deploy pages
@@ -54,10 +52,13 @@ jobs:
       - name: Download built files
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: github-pages
           path: .
-      - name: Deploy to pages
+      - name: Upload artifact for pages
+        uses: actions/upload-pages-artifact@v2
+        with:
+          name: github-pages
+          path: .
+      - name: Deploy pages
         id: deployment
         uses: actions/deploy-pages@v3
-        with:
-          artifact_name: ${{ env.ARTIFACT_NAME }}
