@@ -51,6 +51,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Download built files
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: .
       - name: Deploy to pages
         id: deployment
         uses: actions/deploy-pages@v3
