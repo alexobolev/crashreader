@@ -8,7 +8,7 @@ on:
       - Dockerfile
   workflow_dispatch:
 env:
-  ARTIFACT_NAME: ${{ github.repository }}-dist
+  ARTIFACT_NAME: crashreader-dist
 jobs:
   build-app:
     name: Build application
