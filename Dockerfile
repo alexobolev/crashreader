@@ -8,4 +8,4 @@ RUN apt-get update && apt-get install -y nodejs npm
 RUN npm install -g wasm-pack
 
 COPY ./build/docker.sh build.sh
-CMD ["/bin/bash", "build.sh"]
+CMD ["/bin/bash"]

@@ -4,11 +4,11 @@
 # THIS ASSUMES THAT THE REPO ROOT IS MOUNTED AT /usr/src/build!
 
 
-# Change to the mounted output directory.
+# Change to the mounted input/output directory.
 cd /usr/src/build
 
 # Nuke package.lock to fix a @rollup build error.
-rm ./package-lock.json
+rm ./package-lock.json || true
 
 # Build our WebAssembly core, required further.
 npm run wasm
