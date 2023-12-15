@@ -1,11 +1,11 @@
 #!/bin/bash
 
 
-# Copy files in mounted input directory to the mounted output directory.
-cp -r /usr/src/build-src /usr/src/build-dest
+# THIS ASSUMES THAT THE REPO ROOT IS MOUNTED AT /usr/src/build!
+
 
 # Change to the mounted output directory.
-cd /usr/src/build-dest
+cd /usr/src/build
 
 # Nuke package.lock to fix a @rollup build error.
 rm ./package-lock.json
