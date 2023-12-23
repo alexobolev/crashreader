@@ -235,12 +235,13 @@ export default function CRUpload() {
     if (crashBuffer !== null && exeBuffer !== null) {
       try {
         const parsed = wa_parse_crash(crashBuffer, exeBuffer)
+        console.log(parsed)
         setCrashInfo(parsed)
         setParseError(null)
-        console.log(parsed)
       } catch (error) {
+        console.log(error.message)
         setCrashInfo(null)
-        setParseError(error)
+        setParseError(error.message)
       }
     }
   }
