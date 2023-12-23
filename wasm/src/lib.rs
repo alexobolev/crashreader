@@ -1,6 +1,8 @@
 use breakpad_symbols::{Symbolizer, SimpleSymbolSupplier};
 use goblin::pe::{PE, options::ParseOptions};
 use minidump_processor::process_minidump;
+use serde::Serialize;
+use serde_wasm_bindgen::Serializer as WasmSerializer;
 use wasm_bindgen::prelude::*;
 
 mod crash_info;
@@ -33,8 +35,9 @@ fn parse_crash(crash_slice: &[u8], exe_slice: &[u8]) -> Result<CrashInfo, String
 
 #[wasm_bindgen]
 pub fn wa_parse_crash(crash_slice: Box<[u8]>, exe_slice: Box<[u8]>) -> Result<JsValue, JsValue> {
+    let serializer = WasmSerializer::new().serialize_large_number_types_as_bigints(true);
     match parse_crash(crash_slice.as_ref(), exe_slice.as_ref()) {
-        Ok(info) => Ok(serde_wasm_bindgen::to_value(&info)?),
+        Ok(info) => Ok(info.serialize(&serializer)?),
         Err(error) => Err(JsValue::from_str(&error)),
     }
 }
